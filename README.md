@@ -10,6 +10,7 @@ imports) compiled from the checked-in `wasm/timeseries.wat` source.
 npm install     # once: installs `wabt`, used only by the build
 npm run build   # one-command reproducible build of the .wasm from the .wat
 node test.mjs   # smoke-tests the checked-in binary; no dependencies needed
+npm run verify  # manual check of the raw sum / moving_average exports
 ```
 
 ### Exports

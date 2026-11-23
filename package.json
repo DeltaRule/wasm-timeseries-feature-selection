@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "test": "node test.mjs"
+    "test": "node test.mjs",
+    "verify": "node verify.mjs"
   },
   "devDependencies": {
     "wabt": "^1.0.37"

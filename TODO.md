@@ -15,6 +15,7 @@ finished, tick its checkbox and append newly discovered follow-up items.
 
 ## Follow-ups discovered
 
+- [x] Add a standalone manual verification path (`node verify.mjs`) that exercises the raw WASM `sum` and `moving_average` exports (step 1).
 - [ ] Verify the checked-in `wasm/timeseries.wasm` stays byte-identical after `npm run build` (guard against stale binaries).
 - [x] Document the `wabt` dev dependency and the `npm run build` rebuild command in README.md when documenting the API (step 6).
 - [x] Document the `loadTimeseries` loader API (including empty/invalid input behavior and the byte-1024 output layout) in README.md (step 6).
