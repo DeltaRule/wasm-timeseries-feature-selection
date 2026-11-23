@@ -7,10 +7,11 @@ Self-improving WASM time-series feature selection project
 imports) compiled from the checked-in `wasm/timeseries.wat` source.
 
 ```sh
-npm install     # once: installs `wabt`, used only by the build
-npm run build   # one-command reproducible build of the .wasm from the .wat
-node test.mjs   # smoke-tests the checked-in binary; no dependencies needed
-npm run verify  # manual check of the raw sum / moving_average exports
+npm install         # once: installs `wabt`, used only by build/check
+npm run build       # one-command reproducible build of the .wasm from the .wat
+npm run check:build # fail if the checked-in .wasm is stale vs the .wat
+node test.mjs       # smoke-tests the checked-in binary; no dependencies needed
+npm run verify      # manual check of the raw sum / moving_average exports
 ```
 
 ### Exports
@@ -49,8 +50,29 @@ Progress is tracked in [TODO.md](TODO.md).
 - `npm run build` is the one-command, reproducible rebuild: it runs
   `node build.mjs`, which parses and validates `wasm/timeseries.wat` and writes
   `wasm/timeseries.wasm`. Run it after every edit to the `.wat` source and
-  commit the regenerated binary alongside the source. `npm run build` and
-  `npm test` are thin aliases for `node build.mjs` and `node test.mjs`.
+   commit the regenerated binary alongside the source. `npm run build` and
+   `npm test` are thin aliases for `node build.mjs` and `node test.mjs`.
+- `npm run check:build` is a thin alias for `node check-build.mjs`, the
+  stale-binary guard described below.
+
+### Stale-binary guard
+
+`npm run check:build` regenerates `wasm/timeseries.wasm` in memory from
+`wasm/timeseries.wat` using the exact same compiler options as `npm run build`
+(both call `compileTimeseries` in `wasm-compile.mjs`) and compares the result
+byte-for-byte with the checked-in file. A stale binary makes the command exit
+non-zero with a message naming both byte counts and the first differing byte,
+plus a reminder to run `npm run build`. The check reports drift without overwriting
+the checked-in artifact: only `npm run build` writes the file.
+
+The same check runs at the start of `node test.mjs` when `wabt` is installed, so
+`npm test` fails loudly on drift too. To preserve the no-install guarantee, the
+check skips gracefully with `wabt is not installed` when the dependency is
+missing; the rest of the suite still runs and passes. Use
+`npm run check:build` in CI after `npm ci` to make drift an unconditional
+failure. `test.mjs` also exercises the guard with matching bytes and a
+simulated stale binary in a temporary directory, asserting that the mismatch is
+reported and the file is left untouched.
 
 ## API
 

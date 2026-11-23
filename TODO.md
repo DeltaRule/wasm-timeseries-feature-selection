@@ -16,7 +16,7 @@ finished, tick its checkbox and append newly discovered follow-up items.
 ## Follow-ups discovered
 
 - [x] Add a standalone manual verification path (`node verify.mjs`) that exercises the raw WASM `sum` and `moving_average` exports (step 1).
-- [ ] Verify the checked-in `wasm/timeseries.wasm` stays byte-identical after `npm run build` (guard against stale binaries).
+- [x] Verify the checked-in `wasm/timeseries.wasm` stays byte-identical after `npm run build` (guard against stale binaries).
 - [x] Document the `wabt` dev dependency and the `npm run build` rebuild command in README.md when documenting the API (step 6).
 - [x] Document the `loadTimeseries` loader API (including empty/invalid input behavior and the byte-1024 output layout) in README.md (step 6).
 - [x] Document the loader's adaptive output pointer for series longer than 128 f64 values (input at byte 0, output after the input region) in README.md (step 6).
@@ -28,3 +28,6 @@ finished, tick its checkbox and append newly discovered follow-up items.
 - [ ] Consider handling the loader's 16-page memory ceiling gracefully: `memory.grow` currently throws a raw `RangeError` for inputs requiring more than 1 MiB.
 - [ ] Add JSDoc annotations to loader.mjs, features.mjs and select.mjs so reference docs can be generated automatically in a future step.
 - [ ] Add a short end-to-end README example chaining loadTimeseries -> extractFeatures -> selectFeatures in a future step.
+- [ ] Run `npm ci && npm run check:build` in a CI workflow so stale-binary drift fails on every push (the `node test.mjs` check skips when wabt is absent).
+- [ ] Consider pinning `wabt` to an exact version so a dependency upgrade cannot cause a false stale-binary report.
+- [ ] Consider adding a check that `npm run build` is idempotent (a second build leaves the binary unchanged).
