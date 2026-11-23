@@ -112,6 +112,24 @@ assert.deepEqual(
   "loader moving average of a long series",
 );
 
+const hugeSeries = Array.from({ length: 20000 }, (_, i) => i + 1);
+assert.equal(
+  loader.sum(hugeSeries),
+  200010000,
+  "loader sum grows WASM memory beyond the initial 2 pages",
+);
+const hugeAverages = loader.movingAverage(hugeSeries, 2);
+assert.equal(
+  hugeAverages.length,
+  19999,
+  "loader moving average grows memory for a large adaptive output region",
+);
+assert.deepEqual(
+  [hugeAverages[0], hugeAverages[hugeAverages.length - 1]],
+  [1.5, 19999.5],
+  "loader moving average writes correct values after memory growth",
+);
+
 for (const bad of [
   null,
   undefined,

@@ -10,7 +10,7 @@ finished, tick its checkbox and append newly discovered follow-up items.
 - [x] Add a JS loader for the WASM module.
 - [x] Add a feature-extraction function (mean, min, max, slope) over a series.
 - [x] Add a simple feature-selection scorer ranking features by usefulness.
-- [ ] Add a test suite runnable with `node test.mjs`.
+- [x] Add a test suite runnable with `node test.mjs`.
 - [ ] Document the API and the loop in README.md.
 
 ## Follow-ups discovered
@@ -23,3 +23,5 @@ finished, tick its checkbox and append newly discovered follow-up items.
 - [ ] Consider adding variance / standard deviation features on top of the WASM-backed sum in a future step.
 - [ ] Document the synchronous `selectFeatures` scorer API in README.md (step 6): returns `{ name, value, score }` entries ranked by magnitude-normalized usefulness, canonical tie-break `[mean, min, max, slope]`, zero-score behavior for all-zero/empty input, strict validation, and the `scoreFeatures` alias.
 - [ ] Decide in a later step whether unknown feature keys should be accepted or rejected by the scorer (currently scored after the canonical keys and sorted by name).
+- [ ] Document the loader's automatic WASM memory growth behavior and its 16-page (1 MiB) ceiling in README.md (step 6).
+- [ ] Consider handling the loader's 16-page memory ceiling gracefully: `memory.grow` currently throws a raw `RangeError` for inputs requiring more than 1 MiB.
