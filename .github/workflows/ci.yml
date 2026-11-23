@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check-build:
+    name: WASM binary freshness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js 20 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install pinned dependencies
+        run: npm ci
+      - name: Check WASM binary freshness
+        run: npm run check:build
+      - name: Run test suite
+        run: node test.mjs

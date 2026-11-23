@@ -28,7 +28,7 @@ finished, tick its checkbox and append newly discovered follow-up items.
 - [x] Handle the loader's 16-page memory ceiling gracefully: reject oversized input/output regions with a descriptive `RangeError` before calling `memory.grow`, and document the error in README.md.
 - [x] Add JSDoc annotations to loader.mjs, features.mjs and select.mjs so reference docs can be generated automatically in a future step.
 - [x] Add a short end-to-end README example chaining loadTimeseries -> extractFeatures -> selectFeatures in a future step.
-- [ ] Run `npm ci && npm run check:build` in a CI workflow so stale-binary drift fails on every push (the `node test.mjs` check skips when wabt is absent).
+- [x] Run `npm ci && npm run check:build` in a CI workflow so stale-binary drift fails on every push (the `node test.mjs` check skips when wabt is absent).
 - [ ] Consider pinning `wabt` to an exact version so a dependency upgrade cannot cause a false stale-binary report.
 - [ ] Consider adding a check that `npm run build` is idempotent (a second build leaves the binary unchanged).
 - [ ] Consider a numerically stable (e.g. Welford) variance computation: the current mean-of-squared-deviations can overflow to `Infinity` for extremely large finite inputs, which would violate the all-finite guarantee.
@@ -42,3 +42,5 @@ finished, tick its checkbox and append newly discovered follow-up items.
 - [ ] Add a boundary test proving a series whose input/output regions fit exactly at 16 pages still succeeds while one byte more is rejected.
 - [ ] Generate API reference documentation from the new JSDoc annotations (e.g. with a doc generator) and link the output from README.md.
 - [ ] Consider wiring the reference-doc generation into CI so missing/outdated annotations fail on every push.
+- [ ] Add a CI status badge to README.md so the freshness guard's state is visible at a glance.
+- [ ] Consider making CI fail explicitly if `npm run check:build` reports `SKIP` instead of `OK`, as defense in depth against a dependency-install regression.

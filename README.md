@@ -54,6 +54,10 @@ Progress is tracked in [TODO.md](TODO.md).
    `npm test` are thin aliases for `node build.mjs` and `node test.mjs`.
 - `npm run check:build` is a thin alias for `node check-build.mjs`, the
   stale-binary guard described below.
+- CI is configured in `.github/workflows/ci.yml`: every push to `main` and every
+  pull request checks out the repo, sets up Node.js 20 LTS, installs the exact
+  versions from `package-lock.json` with `npm ci`, then runs `npm run check:build`
+  and `node test.mjs`. Drift therefore fails CI unconditionally.
 
 ### Stale-binary guard
 
@@ -68,11 +72,18 @@ the checked-in artifact: only `npm run build` writes the file.
 The same check runs at the start of `node test.mjs` when `wabt` is installed, so
 `npm test` fails loudly on drift too. To preserve the no-install guarantee, the
 check skips gracefully with `wabt is not installed` when the dependency is
-missing; the rest of the suite still runs and passes. Use
-`npm run check:build` in CI after `npm ci` to make drift an unconditional
-failure. `test.mjs` also exercises the guard with matching bytes and a
-simulated stale binary in a temporary directory, asserting that the mismatch is
-reported and the file is left untouched.
+missing; the rest of the suite still runs and passes.
+
+That skip is exactly why `.github/workflows/ci.yml` runs `npm ci` followed by
+`npm run check:build` on every push to `main` and on every pull request:
+`npm ci` installs the pinned `wabt` from `package-lock.json`, so the guard
+cannot silently skip and a stale `wasm/timeseries.wasm` fails CI
+unconditionally. The workflow then runs
+`node test.mjs` for full verification with dependencies installed. To reproduce
+CI locally, run `npm ci && npm run check:build && node test.mjs`. `test.mjs` also
+exercises the guard with matching bytes and a simulated stale binary in a
+temporary directory, asserting that the mismatch is reported and the file is
+left untouched.
 
 ## API
 

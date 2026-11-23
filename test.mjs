@@ -754,6 +754,35 @@ for (const [label, text] of [
 
 console.log("README documentation checks passed");
 
+const ciWorkflow = await readFile(
+  new URL("./.github/workflows/ci.yml", import.meta.url),
+  "utf8",
+);
+
+for (const [label, text] of [
+  ["CI workflow name", "name: CI"],
+  ["push-to-main trigger", "branches: [main]"],
+  ["pull-request trigger", "pull_request:"],
+  ["repository checkout", "actions/checkout@"],
+  ["Node LTS setup", "actions/setup-node@"],
+  ["Node LTS version", 'node-version: "20"'],
+  ["pinned dependency install", "npm ci"],
+  ["unconditional freshness check", "npm run check:build"],
+  ["full test suite", "node test.mjs"],
+]) {
+  assert.ok(ciWorkflow.includes(text), `CI workflow has ${label}`);
+}
+
+for (const [label, text] of [
+  ["CI workflow path", ".github/workflows/ci.yml"],
+  ["CI npm ci command", "`npm ci`"],
+  ["CI unconditional drift failure", "fails CI unconditionally"],
+]) {
+  assert.ok(readme.includes(text), `README documents ${label}`);
+}
+
+console.log("CI workflow checks passed");
+
 const exampleStart = readme.indexOf("### End-to-end example");
 assert.ok(exampleStart !== -1, "README has an End-to-end example section");
 const exampleSection = readme.slice(
