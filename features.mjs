@@ -38,7 +38,7 @@ export async function extractFeatures(values) {
   const length = series.length;
 
   if (length === 0) {
-    return { mean: 0, min: 0, max: 0, slope: 0 };
+    return { mean: 0, min: 0, max: 0, slope: 0, variance: 0, stddev: 0 };
   }
 
   let min = series[0];
@@ -49,6 +49,14 @@ export async function extractFeatures(values) {
   }
 
   const mean = timeseries.sum(series) / length;
+
+  let variance = 0;
+  for (let i = 0; i < length; i += 1) {
+    const deviation = series[i] - mean;
+    variance += deviation * deviation;
+  }
+  variance /= length;
+  const stddev = Math.sqrt(variance);
 
   let slope = 0;
   if (length > 1) {
@@ -63,5 +71,5 @@ export async function extractFeatures(values) {
     slope = covariance / indexVariance;
   }
 
-  return { mean, min, max, slope };
+  return { mean, min, max, slope, variance, stddev };
 }

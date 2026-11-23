@@ -191,45 +191,92 @@ console.log("Loader checks passed");
 
 assert.deepEqual(
   await extractFeatures([1, 2, 3, 4]),
-  { mean: 2.5, min: 1, max: 4, slope: 1 },
-  "features of an ascending representative series",
+  {
+    mean: 2.5,
+    min: 1,
+    max: 4,
+    slope: 1,
+    variance: 1.25,
+    stddev: Math.sqrt(1.25),
+  },
+  "features of an ascending representative series include known variance/stddev",
 );
+
+const descendingFeatures = await extractFeatures([10, 8.5, 6, 4, 2]);
 assert.deepEqual(
-  await extractFeatures([10, 8.5, 6, 4, 2]),
+  {
+    mean: descendingFeatures.mean,
+    min: descendingFeatures.min,
+    max: descendingFeatures.max,
+    slope: descendingFeatures.slope,
+  },
   { mean: 6.1, min: 2, max: 10, slope: -2.05 },
   "features of a descending series with fractional values",
 );
+assert.ok(
+  Math.abs(descendingFeatures.variance - 8.44) < 1e-12,
+  "population variance of the descending series divides by n",
+);
+assert.equal(
+  descendingFeatures.stddev,
+  Math.sqrt(descendingFeatures.variance),
+  "stddev is the square root of variance",
+);
+
 assert.deepEqual(
   await extractFeatures([3, 3, 3, 3]),
-  { mean: 3, min: 3, max: 3, slope: 0 },
-  "features of a constant series have zero slope",
+  { mean: 3, min: 3, max: 3, slope: 0, variance: 0, stddev: 0 },
+  "features of a constant series have zero slope, variance and stddev",
 );
 assert.deepEqual(
   await extractFeatures([7]),
-  { mean: 7, min: 7, max: 7, slope: 0 },
-  "features of a single-element series",
+  { mean: 7, min: 7, max: 7, slope: 0, variance: 0, stddev: 0 },
+  "features of a single-element series have zero variance and stddev",
 );
 assert.deepEqual(
   await extractFeatures([]),
-  { mean: 0, min: 0, max: 0, slope: 0 },
+  { mean: 0, min: 0, max: 0, slope: 0, variance: 0, stddev: 0 },
   "features of an empty series are all zero",
 );
+
+const generatorFeatures = await extractFeatures(
+  (function* () {
+    yield 2;
+    yield 4;
+    yield 6;
+  })(),
+);
 assert.deepEqual(
-  await extractFeatures(
-    (function* () {
-      yield 2;
-      yield 4;
-      yield 6;
-    })(),
-  ),
+  {
+    mean: generatorFeatures.mean,
+    min: generatorFeatures.min,
+    max: generatorFeatures.max,
+    slope: generatorFeatures.slope,
+  },
   { mean: 4, min: 2, max: 6, slope: 2 },
   "features accept a one-shot generator iterable",
+);
+assert.ok(
+  Math.abs(generatorFeatures.variance - 8 / 3) < 1e-12,
+  "generator input produces variance",
+);
+assert.equal(
+  generatorFeatures.stddev,
+  Math.sqrt(generatorFeatures.variance),
+  "generator input produces a finite stddev",
 );
 
 const longFeatureSeries = Array.from({ length: 200 }, (_, i) => 2 * i + 1);
 assert.deepEqual(
   await extractFeatures(longFeatureSeries),
-  { mean: 200, min: 1, max: 399, slope: 2 },
+  {
+    mean: 200,
+    min: 1,
+    max: 399,
+    slope: 2,
+    variance: 13333,
+    stddev: Math.sqrt(13333),
+  },
   "features of a long linear series via the WASM-backed sum",
 );
 
@@ -238,7 +285,34 @@ const mixedFeatures = await extractFeatures(mixedSeries);
 assert.equal(mixedFeatures.mean, -2, "mean of mixed-sign series uses WASM sum");
 assert.equal(mixedFeatures.min, -9, "min is the smallest negative value");
 assert.equal(mixedFeatures.max, 4, "max is the largest positive value");
+assert.equal(
+  mixedFeatures.variance,
+  27.5,
+  "negative/mixed values yield population variance",
+);
+assert.equal(
+  mixedFeatures.stddev,
+  Math.sqrt(27.5),
+  "negative/mixed values yield stddev",
+);
 assert.deepEqual(mixedSeries, [-5, 2, -9, 4], "input series is not mutated");
+
+for (const features of [
+  await extractFeatures([1, 2, 3, 4]),
+  await extractFeatures([10, 8.5, 6, 4, 2]),
+  await extractFeatures([3, 3, 3, 3]),
+  await extractFeatures([7]),
+  await extractFeatures([]),
+  generatorFeatures,
+  mixedFeatures,
+]) {
+  for (const [name, value] of Object.entries(features)) {
+    assert.ok(
+      Number.isFinite(value),
+      `${name} is finite (got ${String(value)})`,
+    );
+  }
+}
 
 for (const bad of [
   null,
@@ -284,8 +358,8 @@ function assertRanking(actual, expected, expectedSum = 1) {
 
 assert.deepEqual(
   CANONICAL_ORDER,
-  ["mean", "min", "max", "slope"],
-  "canonical tie-break order",
+  ["mean", "min", "max", "slope", "variance", "stddev"],
+  "canonical tie-break order appends variance and stddev after slope",
 );
 assert.equal(scoreFeatures, selectFeatures, "scoreFeatures is an alias");
 
@@ -333,34 +407,64 @@ assertRanking(
     { name: "min", value: 0, score: 0 },
     { name: "max", value: 0, score: 0 },
     { name: "slope", value: 0, score: 0 },
+    { name: "variance", value: 0, score: 0 },
+    { name: "stddev", value: 0, score: 0 },
   ],
   0,
 );
 assert.deepEqual(
   zeroFeatures,
-  { mean: 0, min: 0, max: 0, slope: 0 },
+  { mean: 0, min: 0, max: 0, slope: 0, variance: 0, stddev: 0 },
   "all-zero features are not mutated",
 );
 
 const constantRanking = selectFeatures(await extractFeatures([3, 3, 3, 3]));
 assert.deepEqual(
   constantRanking.map(({ name }) => name),
-  ["mean", "min", "max", "slope"],
-  "zero slope ranks last for a constant series",
+  ["mean", "min", "max", "slope", "variance", "stddev"],
+  "zero slope, variance and stddev rank last for a constant series",
 );
 assertRanking(constantRanking, [
   { name: "mean", value: 3, score: 1 / 3 },
   { name: "min", value: 3, score: 1 / 3 },
   { name: "max", value: 3, score: 1 / 3 },
   { name: "slope", value: 0, score: 0 },
+  { name: "variance", value: 0, score: 0 },
+  { name: "stddev", value: 0, score: 0 },
 ]);
 
-assertRanking(selectFeatures(await extractFeatures(mixedSeries)), [
-  { name: "min", value: -9, score: 9 / 16.6 },
-  { name: "max", value: 4, score: 4 / 16.6 },
-  { name: "mean", value: -2, score: 2 / 16.6 },
-  { name: "slope", value: 1.6, score: 1.6 / 16.6 },
-]);
+const mixedRanking = selectFeatures(await extractFeatures(mixedSeries));
+assert.deepEqual(
+  mixedRanking.map(({ name }) => name),
+  ["variance", "min", "stddev", "max", "mean", "slope"],
+  "variance and stddev participate in magnitude-based ranking",
+);
+const mixedTotal = mixedRanking.reduce(
+  (total, { value }) => total + Math.abs(value),
+  0,
+);
+assertRanking(
+  mixedRanking,
+  mixedRanking.map(({ name, value }) => ({
+    name,
+    value,
+    score: Math.abs(value) / mixedTotal,
+  })),
+);
+
+const allTiedRanking = selectFeatures({
+  stddev: 5,
+  variance: 5,
+  slope: 5,
+  max: 5,
+  min: 5,
+  mean: 5,
+});
+assert.deepEqual(
+  allTiedRanking.map(({ name }) => name),
+  ["mean", "min", "max", "slope", "variance", "stddev"],
+  "ties among all six keys use the appended canonical order",
+);
 
 const tieRanking = selectFeatures({ slope: 5, max: 5, min: 5, mean: 5 });
 assert.deepEqual(
@@ -464,15 +568,28 @@ for (const [label, text] of [
   ["empty/invalid input behavior", "returns `[]`"],
   ["TypeError validation", "TypeError"],
   ["async feature API", "extractFeatures(values)"],
-  ["feature result shape", "{ mean, min, max, slope }"],
-  ["empty series features", "{ mean: 0, min: 0, max: 0, slope: 0 }"],
+  [
+    "feature result shape with variance/stddev",
+    "{ mean, min, max, slope, variance, stddev }",
+  ],
+  ["population variance definition", "population"],
+  ["stddev definition", "`Math.sqrt(variance)`"],
+  [
+    "empty series features with variance/stddev",
+    "{ mean: 0, min: 0, max: 0, slope: 0, variance: 0, stddev: 0 }",
+  ],
   ["single-element slope", "single-element series"],
+  ["zero dispersion features", "`variance === stddev === 0`"],
   ["sync scorer API", "selectFeatures(features)"],
   ["scoreFeatures alias", "scoreFeatures === selectFeatures"],
   ["ranking entry shape", "{ name, value, score }"],
   ["magnitude normalization", "|value| / max(|values|)"],
   ["scores in [0, 1]", "`[0, 1]`"],
-  ["canonical tie-break order", '["mean", "min", "max", "slope"]'],
+  [
+    "canonical tie-break order with appended variance/stddev",
+    '["mean", "min", "max", "slope", "variance", "stddev"]',
+  ],
+  ["appended canonical keys", "appended **after**"],
   ["all-zero score behavior", "every score `0`"],
   ["extra/unknown keys", "Extra/unknown keys"],
   ["PM role", "**PM**"],

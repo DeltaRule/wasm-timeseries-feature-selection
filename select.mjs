@@ -1,4 +1,11 @@
-export const CANONICAL_ORDER = Object.freeze(["mean", "min", "max", "slope"]);
+export const CANONICAL_ORDER = Object.freeze([
+  "mean",
+  "min",
+  "max",
+  "slope",
+  "variance",
+  "stddev",
+]);
 
 function canonicalRank(name) {
   const index = CANONICAL_ORDER.indexOf(name);

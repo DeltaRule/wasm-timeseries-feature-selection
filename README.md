@@ -145,17 +145,26 @@ the binary is asynchronous; the two methods it returns are synchronous.
 import { extractFeatures } from "./features.mjs";
 
 await extractFeatures([1, 2, 3, 4]);
-// { mean: 2.5, min: 1, max: 4, slope: 1 }
+// {
+//   mean: 2.5, min: 1, max: 4, slope: 1,
+//   variance: 1.25, stddev: Math.sqrt(1.25),
+// }
 ```
 
-- Returns a promise resolving to `{ mean, min, max, slope }`, all finite JS
-  numbers.
+- Returns a promise resolving to
+  `{ mean, min, max, slope, variance, stddev }`, all finite JS numbers.
 - `mean` is the WASM-backed `sum` of the series divided by its length; `min`
   and `max` come from a single scan; `slope` is the ordinary least-squares
   slope of the values against their zero-based index (the linear trend).
-- An empty series yields `{ mean: 0, min: 0, max: 0, slope: 0 }`.
-- A single-element series has `slope: 0` (and `mean === min === max`); a
-  constant series also has `slope: 0`.
+- `variance` is the **population** variance: the mean of the squared
+  deviations from that WASM-backed `mean` (dividing by `n`, not `n - 1`).
+  `stddev` is `Math.sqrt(variance)`. Both are computed from the same scan of
+  the series and are returned alongside the original four features.
+- An empty series yields
+  `{ mean: 0, min: 0, max: 0, slope: 0, variance: 0, stddev: 0 }`.
+- A single-element series has `slope: 0` and `variance === stddev === 0` (and
+  `mean === min === max`); a constant series also has `slope: 0` and
+  `variance === stddev === 0`.
 - Any iterable is accepted, including one-shot generators, and the input is
   never mutated. Non-iterables, non-number elements, and non-finite elements
   reject with a `TypeError`.
@@ -187,10 +196,13 @@ selectFeatures({ mean: 2.5, min: 1, max: 4, slope: 1 });
   and each score is `weight / sum(weights)`. Scores therefore lie in `[0, 1]`
   and sum to `1` for any non-zero input (up to floating-point rounding).
 - Entries are sorted by descending score. Ties are broken by the canonical
-  order `CANONICAL_ORDER = ["mean", "min", "max", "slope"]`, exported from
-  `select.mjs`. Extra/unknown keys are accepted and scored too; on ties they
-  come after the canonical keys and are then ordered deterministically by
-  name (alphabetically).
+  order
+  `CANONICAL_ORDER = ["mean", "min", "max", "slope", "variance", "stddev"]`,
+  exported from `select.mjs`. `variance` and `stddev` are appended **after**
+  `slope`, so the tie-break behavior for `mean`, `min`, `max` and `slope` is
+  unchanged and ties involving the new features stay deterministic.
+  Extra/unknown keys are accepted and scored too; on ties they come after the
+  canonical keys and are then ordered deterministically by name (alphabetically).
 - All-zero features yield every score `0` in canonical order, and an empty
   object yields `[]`. A total of `0` in the all-zero case is intentional:
   there is no magnitude to normalize.

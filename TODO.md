@@ -20,9 +20,9 @@ finished, tick its checkbox and append newly discovered follow-up items.
 - [x] Document the `wabt` dev dependency and the `npm run build` rebuild command in README.md when documenting the API (step 6).
 - [x] Document the `loadTimeseries` loader API (including empty/invalid input behavior and the byte-1024 output layout) in README.md (step 6).
 - [x] Document the loader's adaptive output pointer for series longer than 128 f64 values (input at byte 0, output after the input region) in README.md (step 6).
-- [x] Document the async `extractFeatures` API (returns `{ mean, min, max, slope }`; empty series yields all zeros, single-element series has zero slope) in README.md (step 6).
-- [ ] Consider adding variance / standard deviation features on top of the WASM-backed sum in a future step.
-- [x] Document the synchronous `selectFeatures` scorer API in README.md (step 6): returns `{ name, value, score }` entries ranked by magnitude-normalized usefulness, canonical tie-break `[mean, min, max, slope]`, zero-score behavior for all-zero/empty input, strict validation, and the `scoreFeatures` alias.
+- [x] Document the async `extractFeatures` API (returns `{ mean, min, max, slope, variance, stddev }`; empty series yields all zeros, single-element series has zero slope/variance/stddev) in README.md (step 6).
+- [x] Add population variance and standard deviation features on top of the WASM-backed sum; append `variance` then `stddev` to `CANONICAL_ORDER`; cover them in tests and README.md.
+- [x] Document the synchronous `selectFeatures` scorer API in README.md (step 6): returns `{ name, value, score }` entries ranked by magnitude-normalized usefulness, canonical tie-break `[mean, min, max, slope, variance, stddev]`, zero-score behavior for all-zero/empty input, strict validation, and the `scoreFeatures` alias.
 - [ ] Decide in a later step whether unknown feature keys should be accepted or rejected by the scorer (currently scored after the canonical keys and sorted by name).
 - [x] Document the loader's automatic WASM memory growth behavior and its 16-page (1 MiB) ceiling in README.md (step 6).
 - [ ] Consider handling the loader's 16-page memory ceiling gracefully: `memory.grow` currently throws a raw `RangeError` for inputs requiring more than 1 MiB.
@@ -31,3 +31,6 @@ finished, tick its checkbox and append newly discovered follow-up items.
 - [ ] Run `npm ci && npm run check:build` in a CI workflow so stale-binary drift fails on every push (the `node test.mjs` check skips when wabt is absent).
 - [ ] Consider pinning `wabt` to an exact version so a dependency upgrade cannot cause a false stale-binary report.
 - [ ] Consider adding a check that `npm run build` is idempotent (a second build leaves the binary unchanged).
+- [ ] Consider a numerically stable (e.g. Welford) variance computation: the current mean-of-squared-deviations can overflow to `Infinity` for extremely large finite inputs, which would violate the all-finite guarantee.
+- [ ] Consider clamping variance/stddev (or documenting an explicit limit) for series whose sum overflows the WASM f64 accumulator before division by `n`.
+- [ ] Add variance/stddev to a short end-to-end README example chaining `extractFeatures -> selectFeatures` (alongside the existing loader example).
