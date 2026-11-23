@@ -754,6 +754,51 @@ for (const [label, text] of [
 
 console.log("README documentation checks passed");
 
+const exampleStart = readme.indexOf("### End-to-end example");
+assert.ok(exampleStart !== -1, "README has an End-to-end example section");
+const exampleSection = readme.slice(
+  exampleStart,
+  readme.indexOf("## The self-improvement loop", exampleStart),
+);
+for (const [label, text] of [
+  ["loader import", 'import { loadTimeseries } from "./loader.mjs";'],
+  ["features import", 'import { extractFeatures } from "./features.mjs";'],
+  ["scorer import", 'import { selectFeatures } from "./select.mjs";'],
+  ["WASM helper load", "await loadTimeseries()"],
+  ["top-level await note", "top-level `await`"],
+  ["feature object shown", "variance: 1.25"],
+]) {
+  assert.ok(exampleSection.includes(text), `End-to-end example shows ${label}`);
+}
+
+assert.equal(loader.sum([1, 2, 3, 4]), 10, "example sum is 10");
+const exampleFeatures = await extractFeatures([1, 2, 3, 4]);
+assert.deepEqual(
+  exampleFeatures,
+  {
+    mean: 2.5,
+    min: 1,
+    max: 4,
+    slope: 1,
+    variance: 1.25,
+    stddev: Math.sqrt(1.25),
+  },
+  "example feature object matches the documented values",
+);
+const { mean, min, max, slope } = exampleFeatures;
+assert.deepEqual(
+  selectFeatures({ mean, min, max, slope }),
+  [
+    { name: "max", value: 4, score: 4 / 8.5 },
+    { name: "mean", value: 2.5, score: 2.5 / 8.5 },
+    { name: "min", value: 1, score: 1 / 8.5 },
+    { name: "slope", value: 1, score: 1 / 8.5 },
+  ],
+  "example ranking matches the documented output",
+);
+
+console.log("End-to-end example checks passed");
+
 function stubWabt(binary) {
   return {
     parseWat() {

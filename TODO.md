@@ -27,7 +27,7 @@ finished, tick its checkbox and append newly discovered follow-up items.
 - [x] Document the loader's automatic WASM memory growth behavior and its 16-page (1 MiB) ceiling in README.md (step 6).
 - [x] Handle the loader's 16-page memory ceiling gracefully: reject oversized input/output regions with a descriptive `RangeError` before calling `memory.grow`, and document the error in README.md.
 - [x] Add JSDoc annotations to loader.mjs, features.mjs and select.mjs so reference docs can be generated automatically in a future step.
-- [ ] Add a short end-to-end README example chaining loadTimeseries -> extractFeatures -> selectFeatures in a future step.
+- [x] Add a short end-to-end README example chaining loadTimeseries -> extractFeatures -> selectFeatures in a future step.
 - [ ] Run `npm ci && npm run check:build` in a CI workflow so stale-binary drift fails on every push (the `node test.mjs` check skips when wabt is absent).
 - [ ] Consider pinning `wabt` to an exact version so a dependency upgrade cannot cause a false stale-binary report.
 - [ ] Consider adding a check that `npm run build` is idempotent (a second build leaves the binary unchanged).

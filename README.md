@@ -231,6 +231,41 @@ following behavior is an explicit guarantee:
   is never mutated, and non-number or non-finite values throw a `TypeError`
   before any result is returned — including in unknown keys.
 
+### End-to-end example
+
+Putting the three public functions together gives a complete pipeline. This is
+copy-pasteable ESM under the repo's `"type": "module"` (top-level `await` is
+fine). The `loadTimeseries()`, `extractFeatures()` and `selectFeatures()`
+sections above document each layer's full contract.
+
+```js
+import { loadTimeseries } from "./loader.mjs";
+import { extractFeatures } from "./features.mjs";
+import { selectFeatures } from "./select.mjs";
+
+const timeseries = await loadTimeseries(); // independent WASM-backed helper
+timeseries.sum([1, 2, 3, 4]);               // 10
+
+const features = await extractFeatures([1, 2, 3, 4]);
+// { mean: 2.5, min: 1, max: 4, slope: 1,
+//   variance: 1.25, stddev: 1.118033988749895 }
+
+const { mean, min, max, slope } = features; // the four classic features
+const ranked = selectFeatures({ mean, min, max, slope });
+// [
+//   { name: "max",   value: 4,   score: 4 / 8.5 },   // 0.47058823529411764
+//   { name: "mean",  value: 2.5, score: 2.5 / 8.5 }, // 0.29411764705882354
+//   { name: "min",   value: 1,   score: 1 / 8.5 },   // 0.11764705882352941
+//   { name: "slope", value: 1,   score: 1 / 8.5 },   // 0.11764705882352941
+// ]
+```
+
+`ranked` is a fresh array in descending order of usefulness: `max` and `mean`
+lead by magnitude, while `min` and `slope` tie at `1 / 8.5` and fall back to
+the canonical tie-break order. The full `features` object also contains
+`variance` and `stddev`; see the per-API sections for their definitions and
+ranking rules.
+
 ## The self-improvement loop
 
 The repository improves itself one roadmap step at a time, fully automated.
