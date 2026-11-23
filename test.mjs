@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { loadTimeseries } from "./loader.mjs";
 import { extractFeatures } from "./features.mjs";
+import { selectFeatures, scoreFeatures, CANONICAL_ORDER } from "./select.mjs";
 
 const bytes = await readFile(new URL("./wasm/timeseries.wasm", import.meta.url));
 const { instance } = await WebAssembly.instantiate(bytes, {});
@@ -224,3 +225,185 @@ for (const bad of [
 }
 
 console.log("Feature extraction checks passed");
+
+function assertRanking(actual, expected, expectedSum = 1) {
+  assert.equal(actual.length, expected.length, "ranking has the expected length");
+  for (let i = 0; i < expected.length; i += 1) {
+    assert.equal(actual[i].name, expected[i].name, `rank ${i} name`);
+    assert.equal(actual[i].value, expected[i].value, `rank ${i} value`);
+    assert.ok(
+      Math.abs(actual[i].score - expected[i].score) < 1e-12,
+      `rank ${i} score ${actual[i].score} is ${expected[i].score}`,
+    );
+    assert.ok(
+      actual[i].score >= 0 && actual[i].score <= 1,
+      `rank ${i} score is in [0, 1]`,
+    );
+  }
+  const total = actual.reduce((sum, entry) => sum + entry.score, 0);
+  assert.ok(
+    Math.abs(total - expectedSum) < 1e-12,
+    `scores sum to ${expectedSum} (got ${total})`,
+  );
+}
+
+assert.deepEqual(
+  CANONICAL_ORDER,
+  ["mean", "min", "max", "slope"],
+  "canonical tie-break order",
+);
+assert.equal(scoreFeatures, selectFeatures, "scoreFeatures is an alias");
+
+const positiveFeatures = { mean: 2.5, min: 1, max: 4, slope: 1 };
+const positiveRanking = selectFeatures(positiveFeatures);
+assertRanking(positiveRanking, [
+  { name: "max", value: 4, score: 4 / 8.5 },
+  { name: "mean", value: 2.5, score: 2.5 / 8.5 },
+  { name: "min", value: 1, score: 1 / 8.5 },
+  { name: "slope", value: 1, score: 1 / 8.5 },
+]);
+assert.deepEqual(
+  positiveFeatures,
+  { mean: 2.5, min: 1, max: 4, slope: 1 },
+  "selectFeatures does not mutate its input",
+);
+
+const frozenFeatures = Object.freeze({ mean: 2.5, min: 1, max: 4, slope: 1 });
+assert.deepEqual(
+  selectFeatures(frozenFeatures),
+  positiveRanking,
+  "frozen feature objects are accepted",
+);
+assert.equal(
+  typeof positiveRanking.then,
+  "undefined",
+  "selectFeatures is synchronous",
+);
+assert.deepEqual(
+  selectFeatures(positiveFeatures),
+  positiveRanking,
+  "selectFeatures is deterministic",
+);
+assert.notEqual(
+  selectFeatures(positiveFeatures),
+  positiveRanking,
+  "selectFeatures returns a fresh array",
+);
+
+const zeroFeatures = await extractFeatures([]);
+assertRanking(
+  selectFeatures(zeroFeatures),
+  [
+    { name: "mean", value: 0, score: 0 },
+    { name: "min", value: 0, score: 0 },
+    { name: "max", value: 0, score: 0 },
+    { name: "slope", value: 0, score: 0 },
+  ],
+  0,
+);
+assert.deepEqual(
+  zeroFeatures,
+  { mean: 0, min: 0, max: 0, slope: 0 },
+  "all-zero features are not mutated",
+);
+
+const constantRanking = selectFeatures(await extractFeatures([3, 3, 3, 3]));
+assert.deepEqual(
+  constantRanking.map(({ name }) => name),
+  ["mean", "min", "max", "slope"],
+  "zero slope ranks last for a constant series",
+);
+assertRanking(constantRanking, [
+  { name: "mean", value: 3, score: 1 / 3 },
+  { name: "min", value: 3, score: 1 / 3 },
+  { name: "max", value: 3, score: 1 / 3 },
+  { name: "slope", value: 0, score: 0 },
+]);
+
+assertRanking(selectFeatures(await extractFeatures(mixedSeries)), [
+  { name: "min", value: -9, score: 9 / 16.6 },
+  { name: "max", value: 4, score: 4 / 16.6 },
+  { name: "mean", value: -2, score: 2 / 16.6 },
+  { name: "slope", value: 1.6, score: 1.6 / 16.6 },
+]);
+
+const tieRanking = selectFeatures({ slope: 5, max: 5, min: 5, mean: 5 });
+assert.deepEqual(
+  tieRanking.map(({ name }) => name),
+  ["mean", "min", "max", "slope"],
+  "equal scores fall back to the canonical order",
+);
+assertRanking(tieRanking, [
+  { name: "mean", value: 5, score: 0.25 },
+  { name: "min", value: 5, score: 0.25 },
+  { name: "max", value: 5, score: 0.25 },
+  { name: "slope", value: 5, score: 0.25 },
+]);
+
+const extraFeatures = { slope: 1, extra: 2, max: 1, mean: 1, min: 1 };
+const extraRanking = selectFeatures(extraFeatures);
+assert.deepEqual(
+  extraRanking.map(({ name }) => name),
+  ["extra", "mean", "min", "max", "slope"],
+  "additional keys are scored and sorted deterministically",
+);
+assertRanking(extraRanking, [
+  { name: "extra", value: 2, score: 2 / 6 },
+  { name: "mean", value: 1, score: 1 / 6 },
+  { name: "min", value: 1, score: 1 / 6 },
+  { name: "max", value: 1, score: 1 / 6 },
+  { name: "slope", value: 1, score: 1 / 6 },
+]);
+assert.deepEqual(
+  Object.keys(extraFeatures),
+  ["slope", "extra", "max", "mean", "min"],
+  "sorting does not reorder the input's keys",
+);
+
+assert.deepEqual(selectFeatures({}), [], "an empty feature object yields []");
+
+const hugeRanking = selectFeatures({
+  mean: 1e308,
+  min: 1e308,
+  max: 1e308,
+  slope: 1e308,
+});
+assertRanking(hugeRanking, [
+  { name: "mean", value: 1e308, score: 0.25 },
+  { name: "min", value: 1e308, score: 0.25 },
+  { name: "max", value: 1e308, score: 0.25 },
+  { name: "slope", value: 1e308, score: 0.25 },
+]);
+
+for (const bad of [
+  null,
+  undefined,
+  12,
+  "12",
+  true,
+  [],
+  [1, 2],
+  () => {},
+  { mean: NaN },
+  { mean: Infinity },
+  { mean: -Infinity },
+  { mean: "1" },
+  { mean: undefined },
+  { mean: null },
+  { mean: 1, min: 2, max: 3, slope: false },
+]) {
+  assert.throws(
+    () => selectFeatures(bad),
+    (error) =>
+      error instanceof TypeError &&
+      /must be an object|finite number/.test(error.message),
+    `selectFeatures rejects ${String(bad)}`,
+  );
+  assert.throws(
+    () => scoreFeatures(bad),
+    TypeError,
+    `scoreFeatures rejects ${String(bad)}`,
+  );
+}
+
+console.log("Feature selection checks passed");
