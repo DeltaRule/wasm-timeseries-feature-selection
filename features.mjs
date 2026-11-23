@@ -9,6 +9,20 @@ function getLoader() {
   return loaderPromise;
 }
 
+/**
+ * The six summary features extracted from a series.
+ *
+ * @typedef {object} FeatureValues
+ * @property {number} mean - Arithmetic mean (WASM-backed sum divided by `n`).
+ * @property {number} min - Smallest value in the series.
+ * @property {number} max - Largest value in the series.
+ * @property {number} slope - Ordinary least-squares slope of the values
+ *   against their zero-based index (the linear trend).
+ * @property {number} variance - Population variance: the mean of the squared
+ *   deviations from `mean` (divides by `n`, not `n - 1`).
+ * @property {number} stddev - Square root of `variance`.
+ */
+
 function toSeries(values) {
   if (
     values === null ||
@@ -32,6 +46,27 @@ function toSeries(values) {
   return series;
 }
 
+/**
+ * Extracts summary features from a series of finite numbers.
+ *
+ * The input may be any iterable, including a one-shot generator, and is never
+ * mutated. The loader promise is cached at module scope, so repeated calls
+ * reuse a single WASM instance. `mean` uses the loader's WASM-backed `sum`;
+ * `min`/`max` come from one scan, and `slope`, `variance` and `stddev` come
+ * from the same second scan.
+ *
+ * @async
+ * @param {Iterable<number>} values - Iterable of finite numbers.
+ * @returns {Promise<FeatureValues>} A promise resolving to the feature object.
+ *   An empty series yields all zeros (`{ mean: 0, min: 0, max: 0, slope: 0,
+ *   variance: 0, stddev: 0 }`). A single-element series has
+ *   `mean === min === max` and `slope === variance === stddev === 0`; a
+ *   constant series likewise has zero slope, variance and stddev.
+ * @throws {TypeError} As a promise rejection, if `values` is not iterable or
+ *   any element is not a number or is non-finite.
+ * @throws {RangeError} As a promise rejection, if the series is too large for
+ *   the loader's 16-page (1 MiB) WASM memory ceiling.
+ */
 export async function extractFeatures(values) {
   const series = toSeries(values);
   const timeseries = await getLoader();

@@ -26,7 +26,7 @@ finished, tick its checkbox and append newly discovered follow-up items.
 - [x] Decide whether unknown feature keys should be accepted or rejected by the scorer — decision: keep accepting them as an intentional, backwards-compatible extension point; formalize the policy in README.md and lock it in with tests.
 - [x] Document the loader's automatic WASM memory growth behavior and its 16-page (1 MiB) ceiling in README.md (step 6).
 - [x] Handle the loader's 16-page memory ceiling gracefully: reject oversized input/output regions with a descriptive `RangeError` before calling `memory.grow`, and document the error in README.md.
-- [ ] Add JSDoc annotations to loader.mjs, features.mjs and select.mjs so reference docs can be generated automatically in a future step.
+- [x] Add JSDoc annotations to loader.mjs, features.mjs and select.mjs so reference docs can be generated automatically in a future step.
 - [ ] Add a short end-to-end README example chaining loadTimeseries -> extractFeatures -> selectFeatures in a future step.
 - [ ] Run `npm ci && npm run check:build` in a CI workflow so stale-binary drift fails on every push (the `node test.mjs` check skips when wabt is absent).
 - [ ] Consider pinning `wabt` to an exact version so a dependency upgrade cannot cause a false stale-binary report.
@@ -40,3 +40,5 @@ finished, tick its checkbox and append newly discovered follow-up items.
 - [ ] Consider raising the WASM module's declared memory maximum (and the loader's named ceiling together) so series larger than 1 MiB can be processed.
 - [ ] Consider adding a loader helper that automatically splits oversized series into chunks and concatenates the results instead of throwing.
 - [ ] Add a boundary test proving a series whose input/output regions fit exactly at 16 pages still succeeds while one byte more is rejected.
+- [ ] Generate API reference documentation from the new JSDoc annotations (e.g. with a doc generator) and link the output from README.md.
+- [ ] Consider wiring the reference-doc generation into CI so missing/outdated annotations fail on every push.

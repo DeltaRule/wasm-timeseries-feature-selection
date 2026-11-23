@@ -9,6 +9,15 @@ const MAX_MEMORY_PAGES = 16;
 const MAX_MEMORY_BYTES = MAX_MEMORY_PAGES * PAGE_SIZE;
 const MAX_MEMORY_MIB = MAX_MEMORY_BYTES / (1024 * 1024);
 
+/**
+ * A WASM-backed time-series helper with its own independent linear memory.
+ *
+ * @typedef {object} Timeseries
+ * @property {(values: Iterable<number>) => number} sum - Total of a series.
+ * @property {(values: Iterable<number>, window: number) => number[]} movingAverage
+ *   Sliding averages of a series.
+ */
+
 function toSeries(values) {
   if (
     values === null ||
@@ -39,6 +48,20 @@ function toWindow(window) {
   return window >= 1 ? window : null;
 }
 
+/**
+ * Reads and instantiates `wasm/timeseries.wasm` relative to this module file,
+ * so the caller's working directory does not matter.
+ *
+ * Every call resolves to a fresh instance with its own WASM linear memory; two
+ * instances never share state. Loading is asynchronous because reading and
+ * instantiating the binary is asynchronous, while the methods on the resolved
+ * instance are synchronous.
+ *
+ * @async
+ * @returns {Promise<Timeseries>} A promise resolving to an independent helper
+ *   instance exposing {@link Timeseries#sum} and
+ *   {@link Timeseries#movingAverage}.
+ */
 export async function loadTimeseries() {
   const bytes = await readFile(WASM_PATH);
   const { instance } = await WebAssembly.instantiate(bytes, {});
@@ -67,12 +90,48 @@ export async function loadTimeseries() {
   }
 
   return {
+    /**
+     * Sums every value of a series using the WASM `sum` export.
+     *
+     * The series is written as little-endian f64 values starting at byte 0 of
+     * this instance's memory before `sum(0, len)` is called. An empty series
+     * returns `0` without producing a non-finite result.
+     *
+     * @param {Iterable<number>} values - Any iterable of finite numbers
+     *   (arrays, generators, ...). The input is never mutated.
+     * @returns {number} The total of all values as a JS number.
+     * @throws {TypeError} If `values` is not iterable, or if any element is
+     *   not a number or is non-finite (`NaN`, `Infinity`, `-Infinity`).
+     * @throws {RangeError} If writing the series would exceed this module's
+     *   16-page (1 MiB) WASM memory ceiling.
+     */
     sum(values) {
       const series = toSeries(values);
       writeInput(series);
       return sum(INPUT_PTR, series.length);
     },
 
+    /**
+     * Computes sliding averages of a series using the WASM `moving_average`
+     * export. Result `i` is the mean of `values[i] .. values[i + window - 1]`.
+     *
+     * Results are written after the input region (byte 1024 for up to 128 f64
+     * values, otherwise immediately after the input) and copied into a fresh
+     * array, so successive calls never return stale output.
+     *
+     * @param {Iterable<number>} values - Any iterable of finite numbers. The
+     *   same validation as {@link Timeseries#sum} applies.
+     * @param {number} window - Integer window width; widths below `1` or
+     *   greater than the series length yield an empty result.
+     * @returns {number[]} A fresh array of length
+     *   `values.length - window + 1`, or `[]` for an empty series or an
+     *   invalid-but-integer window. A window of `1` copies the input.
+     * @throws {TypeError} If `values` is not iterable or contains a non-number
+     *   or non-finite element, or if `window` is not an integer number
+     *   (`NaN`, `Infinity`, `1.5`, `"2"`, ...).
+     * @throws {RangeError} If the input or adaptive output region would
+     *   exceed the 16-page (1 MiB) WASM memory ceiling.
+     */
     movingAverage(values, window) {
       const series = toSeries(values);
       const size = toWindow(window);
