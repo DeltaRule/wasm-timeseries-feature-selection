@@ -425,3 +425,41 @@ for (const bad of [
 }
 
 console.log("Feature selection checks passed");
+
+const readme = await readFile(new URL("./README.md", import.meta.url), "utf8");
+
+for (const [label, text] of [
+  ["WASM Step 1 section", "## Step 1: time-series WASM module"],
+  ["WASM ABI section", "Memory / ABI convention"],
+  ["wabt dev dependency", "`wabt`"],
+  ["reproducible build command", "npm run build"],
+  ["async loader API", "loadTimeseries()"],
+  ["sum method", "sum(values)"],
+  ["movingAverage method", "movingAverage(values, window)"],
+  ["byte-1024 output layout", "1024"],
+  ["adaptive output pointer", "max(1024, values.length * 8)"],
+  ["WASM memory growth", "memory.grow()"],
+  ["16-page memory ceiling", "16 pages (1 MiB)"],
+  ["empty/invalid input behavior", "returns `[]`"],
+  ["TypeError validation", "TypeError"],
+  ["async feature API", "extractFeatures(values)"],
+  ["feature result shape", "{ mean, min, max, slope }"],
+  ["empty series features", "{ mean: 0, min: 0, max: 0, slope: 0 }"],
+  ["single-element slope", "single-element series"],
+  ["sync scorer API", "selectFeatures(features)"],
+  ["scoreFeatures alias", "scoreFeatures === selectFeatures"],
+  ["ranking entry shape", "{ name, value, score }"],
+  ["magnitude normalization", "|value| / max(|values|)"],
+  ["scores in [0, 1]", "`[0, 1]`"],
+  ["canonical tie-break order", '["mean", "min", "max", "slope"]'],
+  ["all-zero score behavior", "every score `0`"],
+  ["extra/unknown keys", "Extra/unknown keys"],
+  ["PM role", "**PM**"],
+  ["Developer role", "**Developer**"],
+  ["Reviewer role", "**Reviewer**"],
+  ["node test.mjs in loop", "`node test.mjs`"],
+]) {
+  assert.ok(readme.includes(text), `README documents ${label}`);
+}
+
+console.log("README documentation checks passed");
