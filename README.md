@@ -201,11 +201,31 @@ selectFeatures({ mean: 2.5, min: 1, max: 4, slope: 1 });
   exported from `select.mjs`. `variance` and `stddev` are appended **after**
   `slope`, so the tie-break behavior for `mean`, `min`, `max` and `slope` is
   unchanged and ties involving the new features stay deterministic.
-  Extra/unknown keys are accepted and scored too; on ties they come after the
-  canonical keys and are then ordered deterministically by name (alphabetically).
-- All-zero features yield every score `0` in canonical order, and an empty
-  object yields `[]`. A total of `0` in the all-zero case is intentional:
-  there is no magnitude to normalize.
+- All-zero features yield every score `0` in canonical order (canonical keys
+  first, then unknown keys alphabetically), and an empty object yields `[]`.
+  A total of `0` in the all-zero case is intentional: there is no magnitude to
+  normalize.
+
+#### Unknown feature keys (policy)
+
+`CANONICAL_ORDER` is **not** an allow-list: it is only the tie-break order for
+the six built-in features. **Extra/unknown keys are intentionally accepted** as
+a backwards-compatible extension point for custom features — rejecting them
+would break the already documented and tested custom-feature contract. The
+following behavior is an explicit guarantee:
+
+- Every key with a finite numeric value participates **identically** in
+  magnitude-normalized scoring. An unknown key is weighted by
+  `|value| / max(|values|)` exactly like a canonical key, so it can outrank,
+  tie with, or fall below any canonical key purely by magnitude.
+- Ties are resolved deterministically in three tiers: (1) canonical keys first,
+  in `CANONICAL_ORDER` order (`mean`, `min`, `max`, `slope`, `variance`,
+  `stddev`); (2) unknown keys after **all** canonical keys, regardless of name;
+  (3) ties among unknown keys alphabetically by name.
+- Border cases are unchanged: all-zero input scores every key `0` in the same
+  canonical-then-alphabetical order, an empty object returns `[]`, frozen input
+  is never mutated, and non-number or non-finite values throw a `TypeError`
+  before any result is returned — including in unknown keys.
 
 ## The self-improvement loop
 

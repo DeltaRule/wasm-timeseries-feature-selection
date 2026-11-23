@@ -499,6 +499,117 @@ assert.deepEqual(
   "sorting does not reorder the input's keys",
 );
 
+const mixedUnknownRanking = selectFeatures({
+  mean: 2,
+  zeta: 3,
+  slope: -4,
+  alpha: 1,
+});
+assert.deepEqual(
+  mixedUnknownRanking.map(({ name }) => name),
+  ["slope", "zeta", "mean", "alpha"],
+  "unknown keys compete by magnitude alongside canonical keys (abs value)",
+);
+assertRanking(mixedUnknownRanking, [
+  { name: "slope", value: -4, score: 4 / 10 },
+  { name: "zeta", value: 3, score: 3 / 10 },
+  { name: "mean", value: 2, score: 2 / 10 },
+  { name: "alpha", value: 1, score: 1 / 10 },
+]);
+
+const allTiedWithUnknownRanking = selectFeatures({
+  zeta: 1,
+  stddev: 1,
+  alpha: 1,
+  variance: 1,
+  slope: 1,
+  max: 1,
+  min: 1,
+  mean: 1,
+});
+assert.deepEqual(
+  allTiedWithUnknownRanking.map(({ name }) => name),
+  ["mean", "min", "max", "slope", "variance", "stddev", "alpha", "zeta"],
+  "unknown keys tie after all canonical keys and then alphabetically",
+);
+assertRanking(
+  allTiedWithUnknownRanking,
+  ["mean", "min", "max", "slope", "variance", "stddev", "alpha", "zeta"].map(
+    (name) => ({ name, value: 1, score: 1 / 8 }),
+  ),
+);
+
+const unknownTieRanking = selectFeatures({ zeta: 2, middle: 2, alpha: 2 });
+assert.deepEqual(
+  unknownTieRanking.map(({ name }) => name),
+  ["alpha", "middle", "zeta"],
+  "ties among unknown keys are resolved alphabetically by name",
+);
+assertRanking(unknownTieRanking, [
+  { name: "alpha", value: 2, score: 1 / 3 },
+  { name: "middle", value: 2, score: 1 / 3 },
+  { name: "zeta", value: 2, score: 1 / 3 },
+]);
+
+const zeroWithUnknownRanking = selectFeatures({
+  zeta: 0,
+  mean: 0,
+  alpha: 0,
+  stddev: 0,
+});
+assert.deepEqual(
+  zeroWithUnknownRanking.map(({ name }) => name),
+  ["mean", "stddev", "alpha", "zeta"],
+  "all-zero input keeps canonical-then-alphabetical order with unknown keys",
+);
+assertRanking(
+  zeroWithUnknownRanking,
+  ["mean", "stddev", "alpha", "zeta"].map((name) => ({
+    name,
+    value: 0,
+    score: 0,
+  })),
+  0,
+);
+
+const frozenWithUnknown = Object.freeze({ mean: 1, zeta: 3, alpha: 2 });
+assert.deepEqual(
+  selectFeatures(frozenWithUnknown),
+  [
+    { name: "zeta", value: 3, score: 3 / 6 },
+    { name: "alpha", value: 2, score: 2 / 6 },
+    { name: "mean", value: 1, score: 1 / 6 },
+  ],
+  "frozen input with unknown keys is accepted without mutation",
+);
+assert.deepEqual(
+  Object.keys(frozenWithUnknown),
+  ["mean", "zeta", "alpha"],
+  "frozen input key order is not changed",
+);
+
+assert.deepEqual(
+  scoreFeatures({ mean: 1, custom: 2 }),
+  selectFeatures({ mean: 1, custom: 2 }),
+  "scoreFeatures alias applies the same unknown-key policy",
+);
+
+for (const badValue of [NaN, Infinity, -Infinity, "2", null, undefined, false]) {
+  const badUnknown = { mean: 1, custom: badValue };
+  assert.throws(
+    () => selectFeatures(badUnknown),
+    (error) =>
+      error instanceof TypeError &&
+      /features\.custom must be a finite number/.test(error.message),
+    `unknown key with value ${String(badValue)} is rejected`,
+  );
+  assert.throws(
+    () => scoreFeatures(badUnknown),
+    TypeError,
+    `scoreFeatures rejects unknown key with value ${String(badValue)}`,
+  );
+}
+
 assert.deepEqual(selectFeatures({}), [], "an empty feature object yields []");
 
 const hugeRanking = selectFeatures({
@@ -592,6 +703,13 @@ for (const [label, text] of [
   ["appended canonical keys", "appended **after**"],
   ["all-zero score behavior", "every score `0`"],
   ["extra/unknown keys", "Extra/unknown keys"],
+  ["unknown keys intentionally accepted", "intentionally accepted"],
+  [
+    "backwards-compatible extension point",
+    "backwards-compatible extension point",
+  ],
+  ["three-tier tie resolution", "three tiers"],
+  ["unknown-key validation guarantee", "including in unknown keys"],
   ["PM role", "**PM**"],
   ["Developer role", "**Developer**"],
   ["Reviewer role", "**Reviewer**"],

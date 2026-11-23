@@ -23,7 +23,7 @@ finished, tick its checkbox and append newly discovered follow-up items.
 - [x] Document the async `extractFeatures` API (returns `{ mean, min, max, slope, variance, stddev }`; empty series yields all zeros, single-element series has zero slope/variance/stddev) in README.md (step 6).
 - [x] Add population variance and standard deviation features on top of the WASM-backed sum; append `variance` then `stddev` to `CANONICAL_ORDER`; cover them in tests and README.md.
 - [x] Document the synchronous `selectFeatures` scorer API in README.md (step 6): returns `{ name, value, score }` entries ranked by magnitude-normalized usefulness, canonical tie-break `[mean, min, max, slope, variance, stddev]`, zero-score behavior for all-zero/empty input, strict validation, and the `scoreFeatures` alias.
-- [ ] Decide in a later step whether unknown feature keys should be accepted or rejected by the scorer (currently scored after the canonical keys and sorted by name).
+- [x] Decide whether unknown feature keys should be accepted or rejected by the scorer — decision: keep accepting them as an intentional, backwards-compatible extension point; formalize the policy in README.md and lock it in with tests.
 - [x] Document the loader's automatic WASM memory growth behavior and its 16-page (1 MiB) ceiling in README.md (step 6).
 - [ ] Consider handling the loader's 16-page memory ceiling gracefully: `memory.grow` currently throws a raw `RangeError` for inputs requiring more than 1 MiB.
 - [ ] Add JSDoc annotations to loader.mjs, features.mjs and select.mjs so reference docs can be generated automatically in a future step.
@@ -34,3 +34,6 @@ finished, tick its checkbox and append newly discovered follow-up items.
 - [ ] Consider a numerically stable (e.g. Welford) variance computation: the current mean-of-squared-deviations can overflow to `Infinity` for extremely large finite inputs, which would violate the all-finite guarantee.
 - [ ] Consider clamping variance/stddev (or documenting an explicit limit) for series whose sum overflows the WASM f64 accumulator before division by `n`.
 - [ ] Add variance/stddev to a short end-to-end README example chaining `extractFeatures -> selectFeatures` (alongside the existing loader example).
+- [ ] Demonstrate a custom/unknown feature key in the end-to-end README example so the accepted-keys policy is shown, not just described.
+- [ ] Consider extracting the scorer's three-tier tie comparison into a named, exported helper so consumers can reuse the exact canonical-then-alphabetical ordering.
+- [ ] Consider a property-based test that generates arbitrary key sets (canonical + unknown, mixed magnitudes) and asserts the documented scoring/ordering invariants.
