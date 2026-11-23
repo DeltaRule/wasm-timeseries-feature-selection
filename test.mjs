@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { loadTimeseries } from "./loader.mjs";
 
 const bytes = await readFile(new URL("./wasm/timeseries.wasm", import.meta.url));
 const { instance } = await WebAssembly.instantiate(bytes, {});
@@ -58,3 +59,95 @@ assert.equal(moving_average(512, 4, 2, 2048), 3, "offset input/output count");
 assert.deepEqual(readSeries(3, 2048), [3, 5, 7], "offset input/output values");
 
 console.log("WASM module checks passed");
+
+const loader = await loadTimeseries();
+assert.equal(typeof loader.sum, "function", "loader exposes sum");
+assert.equal(
+  typeof loader.movingAverage,
+  "function",
+  "loader exposes movingAverage",
+);
+
+assert.equal(loader.sum([1.5, 2.5, 3, -1]), 6, "loader sum of four values");
+assert.equal(loader.sum([]), 0, "loader sum of empty input");
+assert.equal(loader.sum([-2.5, 2.5]), 0, "loader sum with negatives");
+
+assert.deepEqual(
+  loader.movingAverage([1, 2, 3, 4], 2),
+  [1.5, 2.5, 3.5],
+  "loader moving average with window of 2",
+);
+assert.deepEqual(
+  loader.movingAverage([1, 2, 3, 4], 1),
+  [1, 2, 3, 4],
+  "loader window of 1 is the identity",
+);
+assert.deepEqual(
+  loader.movingAverage([1, 2, 3, 4], 4),
+  [2.5],
+  "loader full-window average",
+);
+assert.deepEqual(loader.movingAverage([], 1), [], "loader empty input");
+
+for (const badWindow of [0, -1, 5]) {
+  assert.deepEqual(
+    loader.movingAverage([1, 2, 3, 4], badWindow),
+    [],
+    `loader invalid window ${badWindow} returns []`,
+  );
+}
+assert.deepEqual(
+  loader.movingAverage([1, 2, 3, 4], 2),
+  [1.5, 2.5, 3.5],
+  "loader does not return stale output after an invalid window",
+);
+
+const longSeries = Array.from({ length: 200 }, (_, i) => i + 1);
+assert.equal(loader.sum(longSeries), 20100, "loader sum of a long series");
+assert.deepEqual(
+  loader.movingAverage(longSeries, 2),
+  Array.from({ length: 199 }, (_, i) => i + 1.5),
+  "loader moving average of a long series",
+);
+
+for (const bad of [
+  null,
+  undefined,
+  {},
+  "12",
+  [1, "2"],
+  [NaN],
+  [Infinity],
+  [-Infinity],
+  [1, undefined],
+]) {
+  assert.throws(
+    () => loader.sum(bad),
+    /finite number/,
+    `loader sum rejects ${String(bad)}`,
+  );
+  assert.throws(
+    () => loader.movingAverage(bad, 1),
+    /finite number/,
+    `loader movingAverage rejects ${String(bad)}`,
+  );
+}
+
+for (const badWindow of [NaN, Infinity, 1.5, "2", null]) {
+  assert.throws(
+    () => loader.movingAverage([1, 2, 3], badWindow),
+    /integer number/,
+    `loader rejects invalid window ${String(badWindow)}`,
+  );
+}
+
+const otherLoader = await loadTimeseries();
+assert.equal(otherLoader.sum([5]), 5, "a second loader instance works");
+assert.deepEqual(
+  otherLoader.movingAverage([5, 7], 2),
+  [6],
+  "loader instances have independent memory",
+);
+assert.equal(loader.sum([10]), 10, "first loader instance keeps its own state");
+
+console.log("Loader checks passed");
