@@ -5,6 +5,9 @@ const INPUT_PTR = 0;
 const OUTPUT_PTR = 1024;
 const BYTES_PER_VALUE = 8;
 const PAGE_SIZE = 64 * 1024;
+const MAX_MEMORY_PAGES = 16;
+const MAX_MEMORY_BYTES = MAX_MEMORY_PAGES * PAGE_SIZE;
+const MAX_MEMORY_MIB = MAX_MEMORY_BYTES / (1024 * 1024);
 
 function toSeries(values) {
   if (
@@ -43,6 +46,13 @@ export async function loadTimeseries() {
   let view = new DataView(memory.buffer);
 
   function ensureCapacity(byteLength) {
+    if (byteLength > MAX_MEMORY_BYTES) {
+      throw new RangeError(
+        `required WASM memory (${byteLength} bytes) exceeds the ` +
+          `${MAX_MEMORY_PAGES}-page (${MAX_MEMORY_MIB} MiB) limit; ` +
+          `split the series into smaller chunks`,
+      );
+    }
     if (byteLength <= view.byteLength) return;
     const pages = Math.ceil((byteLength - view.byteLength) / PAGE_SIZE);
     memory.grow(pages);

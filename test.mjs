@@ -147,6 +147,39 @@ assert.deepEqual(
   "loader moving average writes correct values after memory growth",
 );
 
+function isCapacityError(error) {
+  return (
+    error instanceof RangeError &&
+    /16-page/.test(error.message) &&
+    /1 MiB/.test(error.message) &&
+    /split the series into smaller chunks/.test(error.message)
+  );
+}
+
+const oversizedSeries = Array.from({ length: 131073 }, () => 1);
+assert.throws(
+  () => loader.sum(oversizedSeries),
+  isCapacityError,
+  "loader sum rejects an oversized series with a descriptive RangeError",
+);
+assert.throws(
+  () => loader.movingAverage(oversizedSeries, 2),
+  isCapacityError,
+  "loader moving average rejects an oversized series with a descriptive RangeError",
+);
+
+const outputOverflowSeries = Array.from({ length: 65537 }, (_, i) => i);
+assert.throws(
+  () => loader.movingAverage(outputOverflowSeries, 1),
+  isCapacityError,
+  "loader moving average rejects an output region beyond the ceiling",
+);
+assert.deepEqual(
+  loader.movingAverage([1, 2, 3, 4], 2),
+  [1.5, 2.5, 3.5],
+  "loader keeps working after a rejected oversized series",
+);
+
 for (const bad of [
   null,
   undefined,
@@ -676,6 +709,7 @@ for (const [label, text] of [
   ["adaptive output pointer", "max(1024, values.length * 8)"],
   ["WASM memory growth", "memory.grow()"],
   ["16-page memory ceiling", "16 pages (1 MiB)"],
+  ["graceful memory ceiling error", "split the series into smaller chunks"],
   ["empty/invalid input behavior", "returns `[]`"],
   ["TypeError validation", "TypeError"],
   ["async feature API", "extractFeatures(values)"],

@@ -133,11 +133,15 @@ the binary is asynchronous; the two methods it returns are synchronous.
   whole input region. This adaptive pointer keeps input and output
   non-overlapping for arbitrarily long series while preserving the byte-1024
   layout for short ones.
-- Before each write, capacity is checked and WASM memory is grown with
-  `memory.grow()` in 64 KiB pages whenever needed, so long series are handled
-  automatically. The WASM module declares a maximum of **16 pages (1 MiB)**;
-  a series that would push memory past that ceiling causes `memory.grow()` to
-  throw a raw `RangeError`.
+- Before each write, capacity is checked against the module's declared maximum
+  of **16 pages (1 MiB)** and WASM memory is grown with `memory.grow()` in
+  64 KiB pages whenever needed, so long series are handled automatically.
+- If the requested region would exceed that ceiling, the loader throws a
+  descriptive `RangeError` naming the 16-page (1 MiB) limit and advising you to
+  split the series into smaller chunks. For `movingAverage` this also covers the
+  adaptive output region at `outPtr + count * 8`, which can overflow even when
+  the input alone fits. Input validation still runs first, and empty or
+  invalid-window calls still return `[]` without touching memory.
 
 ### `extractFeatures(values)` — async feature extraction (`features.mjs`)
 
