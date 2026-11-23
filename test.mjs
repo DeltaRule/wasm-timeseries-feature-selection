@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { loadTimeseries } from "./loader.mjs";
+import { extractFeatures } from "./features.mjs";
 
 const bytes = await readFile(new URL("./wasm/timeseries.wasm", import.meta.url));
 const { instance } = await WebAssembly.instantiate(bytes, {});
@@ -151,3 +152,75 @@ assert.deepEqual(
 assert.equal(loader.sum([10]), 10, "first loader instance keeps its own state");
 
 console.log("Loader checks passed");
+
+assert.deepEqual(
+  await extractFeatures([1, 2, 3, 4]),
+  { mean: 2.5, min: 1, max: 4, slope: 1 },
+  "features of an ascending representative series",
+);
+assert.deepEqual(
+  await extractFeatures([10, 8.5, 6, 4, 2]),
+  { mean: 6.1, min: 2, max: 10, slope: -2.05 },
+  "features of a descending series with fractional values",
+);
+assert.deepEqual(
+  await extractFeatures([3, 3, 3, 3]),
+  { mean: 3, min: 3, max: 3, slope: 0 },
+  "features of a constant series have zero slope",
+);
+assert.deepEqual(
+  await extractFeatures([7]),
+  { mean: 7, min: 7, max: 7, slope: 0 },
+  "features of a single-element series",
+);
+assert.deepEqual(
+  await extractFeatures([]),
+  { mean: 0, min: 0, max: 0, slope: 0 },
+  "features of an empty series are all zero",
+);
+assert.deepEqual(
+  await extractFeatures(
+    (function* () {
+      yield 2;
+      yield 4;
+      yield 6;
+    })(),
+  ),
+  { mean: 4, min: 2, max: 6, slope: 2 },
+  "features accept a one-shot generator iterable",
+);
+
+const longFeatureSeries = Array.from({ length: 200 }, (_, i) => 2 * i + 1);
+assert.deepEqual(
+  await extractFeatures(longFeatureSeries),
+  { mean: 200, min: 1, max: 399, slope: 2 },
+  "features of a long linear series via the WASM-backed sum",
+);
+
+const mixedSeries = [-5, 2, -9, 4];
+const mixedFeatures = await extractFeatures(mixedSeries);
+assert.equal(mixedFeatures.mean, -2, "mean of mixed-sign series uses WASM sum");
+assert.equal(mixedFeatures.min, -9, "min is the smallest negative value");
+assert.equal(mixedFeatures.max, 4, "max is the largest positive value");
+assert.deepEqual(mixedSeries, [-5, 2, -9, 4], "input series is not mutated");
+
+for (const bad of [
+  null,
+  undefined,
+  {},
+  "12",
+  [1, "2"],
+  [NaN],
+  [Infinity],
+  [-Infinity],
+  [1, undefined],
+]) {
+  await assert.rejects(
+    () => extractFeatures(bad),
+    (error) =>
+      error instanceof TypeError && /finite number/.test(error.message),
+    `extractFeatures rejects ${String(bad)}`,
+  );
+}
+
+console.log("Feature extraction checks passed");
